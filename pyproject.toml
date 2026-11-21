@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-guardrail-gateway"
+version = "1.0.0"
+description = "Policy-enforcing MCP gateway that turns AI agent write actions on Cisco MCP servers into human-approved, verified, auto-rollback change requests with a tamper-evident audit trail."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Nataraj Angappan" }]
+keywords = ["mcp", "cisco", "ise", "fmc", "ai-agents", "guardrails", "network-automation", "change-management", "zero-trust"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: System Administrators",
+  "Intended Audience :: Telecommunications Industry",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Topic :: System :: Networking",
+  "Topic :: Security",
+]
+dependencies = [
+  "mcp>=2.3,<3",
+  "httpx2>=2.13",
+  "pydantic>=2.8",
+  "pyyaml>=6.0",
+  "typer>=0.12",
+  "uvicorn>=0.30",
+  "starlette>=0.40",
+  "anyio>=4.4",
+  "tzdata>=2024.1; sys_platform == 'win32'",  # IANA zones for change windows (Windows has no system tz database)
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+guardrail = "guardrail_gateway.cli:app"
+guardrail-lab-ise = "guardrail_gateway.demo_upstream:main"
+
+[project.urls]
+Homepage = "https://github.com/natrajexplore/mcp_guardrails"
+Issues = "https://github.com/natrajexplore/mcp_guardrails/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/guardrail_gateway"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "RUF"]
+ignore = ["S101", "S105", "S106", "RUF012", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S", "B"]
+".claude/hooks/*" = ["E501", "S603", "S607"]

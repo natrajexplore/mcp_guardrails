@@ -1,0 +1,126 @@
+# MCP Guardrail Gateway in front of trustsec-policy-agent (Cisco ISE TrustSec).
+#
+#   AI agent ──MCP──> guardrail gateway ──MCP──> trustsec-policy-agent ──ERS──> Cisco ISE
+#
+# Reads (what-if, effective access, findings) pass straight through.
+# Matrix/SGACL writes need a human approval, are snapshotted, verified and
+# rolled back automatically if the result does not match what was approved.
+#
+# Run:  guardrail serve -c examples/gateway-trustsec.yaml
+
+server:
+  name: trustsec-guardrail
+  host: 127.0.0.1
+  port: 8080
+  stdio_identity: noc-agent        # identity used when the gateway itself runs over stdio
+
+storage:
+  database: ./guardrail-data/changes.db
+  audit_log: ./guardrail-data/audit.jsonl
+  audit_hmac_key_env: GUARDRAIL_AUDIT_HMAC_KEY
+
+upstreams:
+  tsa:
+    transport: stdio
+    command: tsagent
+    args: ["serve", "--enable-writes"]
+    env:
+      ISE_HOST: ${ISE_HOST}
+      ISE_USERNAME: ${ISE_USERNAME}
+      ISE_PASSWORD: ${ISE_PASSWORD}
+      ISE_VERIFY_TLS: ${ISE_VERIFY_TLS:-true}
+      TSA_INTENTS: ${TSA_INTENTS:-}
+      TSA_CACHE_SECONDS: "0"
+
+roles:
+  agent:
+    allow_tools: ["tsa__*"]
+    classes: [read, write]
+    max_risk: high
+  viewer:
+    allow_tools: ["tsa__*"]
+    classes: [read]
+  security-approver:
+    allow_tools: ["tsa__*"]
+    classes: [read]
+    can_approve: true
+
+identities:
+  - id: noc-agent
+    roles: [agent]
+    token_env: GUARDRAIL_TOKEN_NOC_AGENT       # or token_sha256: <guardrail token new>
+  - id: soc-viewer
+    roles: [viewer]
+    token_env: GUARDRAIL_TOKEN_SOC_VIEWER
+  - id: alice
+    roles: [security-approver]
+    token_env: GUARDRAIL_TOKEN_ALICE
+  - id: bob
+    roles: [security-approver]
+    token_env: GUARDRAIL_TOKEN_BOB
+
+approvals:
+  by_risk: {low: 0, medium: 1, high: 1, critical: 2}
+  allow_self_approval: false
+  allow_mcp_approval: false        # humans approve via CLI / REST, never the agent itself
+  change_ttl_minutes: 240
+  require_justification: true
+  block_on_state_drift: true
+
+rate_limits:
+  writes_per_minute: 5
+  reads_per_minute: 300
+
+# Uncomment to restrict execution to a maintenance window
+# change_windows:
+#   - {days: [sat, sun], start: "22:00", end: "06:00", tz: Asia/Kolkata}
+
+rules:
+  - match: tsa__update_matrix_cell
+    description: Egress matrix cell create/update on ISE
+    risk: high
+    snapshot:
+      tool: tsa__get_matrix_cell
+      args: {src: "{{args.src}}", dst: "{{args.dst}}"}
+    verify:
+      tool: tsa__get_matrix_cell
+      args: {src: "{{args.src}}", dst: "{{args.dst}}"}
+      expect_json:
+        cell.sgacls: "{{args.sgacls}}"
+    rollback:
+      tool: tsa__update_matrix_cell
+      args:
+        src: "{{args.src}}"
+        dst: "{{args.dst}}"
+        sgacls: "{{snapshot.json.cell.sgacls}}"
+        default_rule: "{{snapshot.json.cell.default_rule}}"
+        status: "{{snapshot.json.cell.status}}"
+    constraints:
+      - arg: sgacls
+        deny_regex: "Permit_IP"
+        message: "attaching Permit_IP through the gateway is not allowed; use an allow-list SGACL"
+      - arg: default_rule
+        deny_regex: "PERMIT_IP"
+        effect: escalate
+        message: "PERMIT_IP catch-all makes the cell a deny-list"
+      - arg: dst
+        deny_regex: "(?i)^ANY$"
+        message: "the default (ANY->ANY) policy can only be changed in ISE by a human"
+
+  - match: tsa__update_sgacl
+    description: SGACL content change (affects every cell that uses it)
+    risk: critical                 # two distinct approvers
+    constraints:
+      - arg: content
+        deny_regex: "(?m)^\\s*permit\\s+ip\\s*$"
+        message: "blanket 'permit ip' is not allowed"
+
+notifications:
+  public_url: ${GUARDRAIL_PUBLIC_URL:-}
+  # webex:
+  #   bot_token: ${WEBEX_BOT_TOKEN}
+  #   room_id: ${WEBEX_ROOM_ID}
+  # splunk_hec:
+  #   url: https://splunk.example.com:8088/services/collector/event
+  #   token: ${SPLUNK_HEC_TOKEN}
+  #   index: netsec

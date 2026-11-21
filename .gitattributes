@@ -1,0 +1,4 @@
+# Store text as LF in the repo (CI and the Docker image run on Linux), whatever the contributor OS.
+* text=auto eol=lf
+*.png binary
+*.whl binary

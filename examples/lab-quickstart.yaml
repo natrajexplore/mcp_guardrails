@@ -1,0 +1,65 @@
+# LAB ONLY - five-minute quick start with the built-in simulated ISE upstream.
+# The tokens below are public demo values. Never reuse them, or this file, in production:
+# generate real tokens with `guardrail token new` and keep only their digests in config.
+#
+#   guardrail serve -c examples/lab-quickstart.yaml
+#
+# Demo bearer tokens:
+#   noc-agent  -> demo-agent-token   (AI agent: read + write, writes need approval)
+#   soc-viewer -> demo-viewer-token  (read only)
+#   alice      -> demo-alice-token   (approver)
+#   bob        -> demo-bob-token     (approver)
+
+server:
+  host: 127.0.0.1
+  port: 8080
+  stdio_identity: noc-agent
+
+storage:
+  database: ./guardrail-lab/changes.db
+  audit_log: ./guardrail-lab/audit.jsonl
+  audit_hmac_key_env: GUARDRAIL_AUDIT_HMAC_KEY
+
+upstreams:
+  ise:
+    transport: stdio
+    command: guardrail-lab-ise      # simulated ISE SGACL API shipped with this package
+
+roles:
+  agent:
+    allow_tools: ["ise__*"]
+    classes: [read, write, destructive]
+  viewer:
+    allow_tools: ["*"]
+    classes: [read]
+  approver:
+    allow_tools: ["*"]
+    classes: [read]
+    can_approve: true
+
+identities:
+  - {id: noc-agent,  roles: [agent],    token_sha256: b83e3e191f2acfe2c3c27f2079c5c13ea8409e9abbf31b671d421d80bbc847c9}
+  - {id: soc-viewer, roles: [viewer],   token_sha256: db2c460a3dd812a27b2a7f60d1320322c27ac3b28b3b90b11c05ecc7b4bcc856}
+  - {id: alice,      roles: [approver], token_sha256: 4348e292502354682288b2cc8d9c5c6e57e1593e045026b7e59c1222cd248974}
+  - {id: bob,        roles: [approver], token_sha256: f53ac7c0c2bf5dd4a7d551a3d4cdadf03b3f2c0923e394749100ecae6e4523f1}
+
+rules:
+  - match: ise__update_sgacl
+    risk: high
+    snapshot: {tool: ise__get_sgacl, args: {name: "{{args.name}}"}}
+    verify:
+      tool: ise__get_sgacl
+      args: {name: "{{args.name}}"}
+      expect_json: {aclcontent: "{{args.aclcontent}}"}
+    rollback:
+      tool: ise__update_sgacl
+      args: {name: "{{args.name}}", aclcontent: "{{snapshot.json.aclcontent}}"}
+    constraints:
+      - arg: aclcontent
+        deny_regex: "(?m)^\\s*permit\\s+ip\\s*$"
+        message: "blanket 'permit ip' is not allowed"
+  - match: ise__delete_*
+    risk: critical
+  - match: ise__set_fault
+    class: write
+    risk: low
