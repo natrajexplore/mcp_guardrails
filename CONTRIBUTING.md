@@ -13,7 +13,7 @@ Thanks for helping. Issues and pull requests are welcome.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pytest -q
+pytest -q -p no:asyncio
 ruff check src tests && ruff format --check src tests
 ```
 
@@ -26,5 +26,7 @@ ruff check src tests && ruff format --check src tests
 
 ## Design principles
 - **Fail safe**: unknown means deny/write/high-risk, never the permissive option.
-- **Deterministic and explainable**: every decision must be traceable to a rule, an ACE line or an audit record.
+- **Deterministic and explainable**: every decision must be traceable to a policy rule and an audit record. No LLM
+  inside the gateway.
+- **Never weaken an invariant**: the security invariants in [AGENTS.md](AGENTS.md) apply to human contributors too.
 - **No secrets at rest**: tokens are stored as SHA-256 digests; secrets are redacted from logs.

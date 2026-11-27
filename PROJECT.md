@@ -31,13 +31,15 @@ Details: [docs/architecture.md](docs/architecture.md). Threat model: [docs/secur
   agent → gateway → trustsec-policy-agent.
 - **Unreleased (2026-11-21).** Hardening pass before submission: concurrency (CAS status updates), cancellation-safe
   execution, full refusal auditing, Windows support. 79 tests, green on Windows; live lab re-validated.
-- Not yet validated: against a real ISE (DevNet sandbox), a Docker image build, or a published GitHub repo.
+- **Published (2026-11-21)** at https://github.com/natrajexplore/mcp_guardrails. CI green on Linux (3.11–3.13) and
+  Windows, Docker image build validated in CI. Description and topics set.
+- Not yet validated: against a real ISE (DevNet sandbox). No demo video yet.
 
 ## Roadmap
 | Priority | Item |
 |---|---|
 | P1 | Validate on DevNet ISE sandbox with trustsec-policy-agent. Record the demo video |
-| P1 | Publish to GitHub, CI green, submit to Code Exchange |
+| P1 | Submit to Code Exchange (repo published and CI green on 2026-11-21) |
 | P2 | Policy packs (rules + snapshot/verify) for the FMC, Catalyst Center and Meraki MCP servers, from `guardrail tools` output |
 | P2 | Webex adaptive card with Approve/Reject buttons (webhook back to REST) |
 | P3 | Minimal approval web UI. ServiceNow change connector |
@@ -60,7 +62,8 @@ A human pushes.
 ## Code Exchange submission checklist
 See `/code-exchange-check`. Public repo, Apache-2.0 LICENSE plus NOTICE, README sections (Use Case, Related Sandbox,
 Installation, Usage, How to test, Known issues, Getting help/involved, Credits, Licensing), CONTRIBUTING,
-CODE_OF_CONDUCT, SECURITY, CI badge, repo topics (`cisco`, `mcp`, `ise`, `ai-agents`, `guardrails`).
+CODE_OF_CONDUCT, SECURITY, CI badge, repo description and topics (`cisco`, `mcp`, `ise`, `ai-agents`, `guardrails`,
+`zero-trust`).
 
 ## Decision log
 | Date | Decision | Why |
